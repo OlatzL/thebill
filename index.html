@@ -1,0 +1,753 @@
+
+<!DOCTYPE html>
+<html lang="eu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ostalaritza Erronka: kalkulatu azkar</title>
+    <!-- CSS Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Animation Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
+        :root {
+            --p1-color: #00f2ff;
+            --p2-color: #ff007a;
+            --accent-gold: #ffcc00;
+        }
+
+        body {
+            background-color: #0a0a0c;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 2:1 Ultrawide layout adjustments */
+        .game-container {
+            display: grid;
+            grid-template-columns: 1fr 400px 1fr;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        .player-zone {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2vh clamp(8px, 1vw, 24px);
+            position: relative;
+            transition: background-color 0.2s ease;
+            min-height: 0;
+        }
+
+        .p1-zone { border-right: 2px solid #1a1a1e; }
+        .p2-zone { border-left: 2px solid #1a1a1e; }
+
+        .price-list-center {
+            background-color: #121214;
+            padding: 1.5vh clamp(8px, 1vw, 24px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-size: clamp(1rem, 1.5vw, 1.25rem);
+            margin-bottom: 0.5vh;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 0.25rem;
+        }
+
+        .option-btn {
+            background: #1e1e22;
+            border: 4px solid transparent;
+            border-radius: 20px;
+            padding: 1.5vh clamp(12px, 2vw, 32px);
+            font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+            font-weight: 900;
+            text-align: center;
+            transition: all 0.1s transform;
+            cursor: pointer;
+            box-shadow: 0 10px 0 #000;
+            margin-bottom: 1vh;
+            min-width: clamp(120px, 15vw, 200px);
+        }
+
+        .option-btn:active {
+            transform: translateY(10px);
+            box-shadow: 0 0 0 #000;
+        }
+
+        .p1-btn:active { background: var(--p1-color); color: #000; border-color: white; }
+        .p2-btn:active { background: var(--p2-color); color: #000; border-color: white; }
+
+        .score-display {
+            font-size: clamp(2rem, 5vw, 4rem);
+            font-weight: 900;
+            opacity: 0.8;
+        }
+
+        .question-box {
+            background: rgba(255,255,255,0.05);
+            border-radius: 30px;
+            padding: 1.5vh clamp(12px, 1.5vw, 24px);
+            text-align: center;
+            min-height: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5vh;
+        }
+
+        .question-text {
+            font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+            line-height: 1.2;
+            font-weight: 700;
+        }
+
+        .feedback-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 900;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .correct { background: rgba(34, 197, 94, 0.4); }
+        .wrong { background: rgba(239, 68, 68, 0.4); }
+
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle, #1a1a1e 0%, #000 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        #game-over-screen {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .giant-btn {
+            background: var(--accent-gold);
+            color: #000;
+            padding: 2vh 4vw;
+            font-size: clamp(2rem, 3.5vw, 3rem);
+            font-weight: 900;
+            border-radius: 100px;
+            margin-top: 2vh;
+            box-shadow: 0 15px 40px rgba(255, 204, 0, 0.3);
+            cursor: pointer;
+        }
+
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Player titles */
+        h3 {
+            font-size: clamp(2rem, 3vw, 2.5rem) !important;
+        }
+
+        /* Start screen */
+        #start-screen h1 {
+            font-size: clamp(3rem, 8vw, 6rem);
+        }
+
+        #start-screen p {
+            font-size: clamp(1rem, 2vw, 1.5rem);
+            padding: 0 2vw;
+        }
+
+        /* Game over screen */
+        #game-over-screen h2 {
+            font-size: clamp(3rem, 8vw, 6rem);
+        }
+
+        #game-over-screen .text-4xl {
+            font-size: clamp(1rem, 2vw, 1.5rem) !important;
+        }
+
+        #game-over-screen .text-8xl {
+            font-size: clamp(2.5rem, 6vw, 4rem) !important;
+        }
+
+        /* Price list center heading */
+        .price-list-center h4 {
+            font-size: clamp(1.5rem, 2.5vw, 2rem) !important;
+            margin-bottom: 1.5vh;
+        }
+
+        /* Progress section */
+        .price-list-center .text-xl {
+            font-size: clamp(0.875rem, 1.25vw, 1rem) !important;
+        }
+
+        .price-list-center .text-2xl {
+            font-size: clamp(1rem, 1.5vw, 1.25rem) !important;
+        }
+
+        /* Game control buttons */
+        .game-controls {
+            display: none;
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .game-controls.active {
+            display: flex;
+        }
+
+        .control-btn {
+            background: #1e1e22;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .control-btn:hover {
+            background: #2a2a2e;
+            border-color: var(--accent-gold);
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .restart-btn {
+            border-color: #ff6b6b;
+        }
+
+        .restart-btn:hover {
+            background: #ff6b6b;
+            color: #000;
+        }
+
+
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+
+    <!-- Start Screen -->
+    <div id="start-screen">
+        <h1 class="font-black mb-8 tracking-tighter">KONTUA MESEDEZ!</h1>
+        <p class="max-w-4xl leading-relaxed text-gray-400">
+            Ostalaritzako ikasleentzako erronka. Kalkulatu bezeroen kontuak azkar eta zuzen. Bihur zaitez zerbitzari onena.
+        </p>
+        <div class="flex gap-8 mt-12">
+            <div class="giant-btn pulse" onclick="game.start(1)">Zerbitzari 1</div>
+            <div class="giant-btn pulse" onclick="game.start(2)">2 zerbitzari</div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen">
+        <h2 id="winner-text" class="font-black mb-8">IRABAZLEA: 1. ZERBITZARIA</h2>
+        <div id="game-over-content" class="flex gap-20 mb-12">
+            <!-- Content injected by JS based on player mode -->
+        </div>
+        <div class="giant-btn" onclick="location.reload()">BERRIRO JOKATU</div>
+    </div>
+
+    <main class="game-container">
+        
+        <!-- Player 1 Zone -->
+        <div id="p1-zone" class="player-zone p1-zone">
+            <div class="flex justify-between items-center">
+                <h3 class="font-black" style="color: var(--p1-color)">1. ZERBITZARIA</h3>
+                <div class="flex flex-col items-end">
+                    <div id="p1-score" class="score-display">0</div>
+                    <div id="p1-time" class="text-2xl opacity-70">0.0s</div>
+                </div>
+            </div>
+            
+            <div class="question-box">
+                <div id="p1-question" class="question-text">Prest?</div>
+            </div>
+
+            <div id="p1-options" class="flex flex-wrap justify-center gap-6">
+                <!-- Buttons injected by JS -->
+            </div>
+            
+            <div id="p1-feedback" class="feedback-overlay"></div>
+        </div>
+
+        <!-- Price List Center -->
+        <aside class="price-list-center">
+            <!-- Game control buttons -->
+            <div id="game-controls" class="game-controls">
+                <button class="control-btn restart-btn" onclick="game.restartGame()">🔄 Hasiera</button>
+            </div>
+            
+            <h4 class="text-accent-gold text-4xl font-black mb-8 border-b-4 border-accent-gold pb-2 w-full text-center">TARIFA</h4>
+            <div id="menu-items" class="w-full">
+                <!-- Injected by JS -->
+            </div>
+            <div class="mt-auto pt-10 text-center">
+                <p class="text-xl text-gray-500 uppercase tracking-widest mb-2">Progresioa</p>
+                <div class="w-64 h-4 bg-gray-800 rounded-full overflow-hidden mx-auto">
+                    <div id="progress-bar" class="h-full bg-accent-gold transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <p id="q-counter" class="text-2xl font-bold mt-2">1 / 10</p>
+            </div>
+        </aside>
+
+        <!-- Player 2 Zone -->
+        <div id="p2-zone" class="player-zone p2-zone">
+            <div class="flex justify-between items-center">
+                <div class="flex flex-col items-start">
+                    <div id="p2-score" class="score-display">0</div>
+                    <div id="p2-time" class="text-2xl opacity-70">0.0s</div>
+                </div>
+                <h3 class="font-black text-right" style="color: var(--p2-color)">2. ZERBITZARIA</h3>
+            </div>
+            
+            <div class="question-box">
+                <div id="p2-question" class="question-text">Prest?</div>
+            </div>
+
+            <div id="p2-options" class="flex flex-wrap justify-center gap-6">
+                <!-- Buttons injected by JS -->
+            </div>
+
+            <div id="p2-feedback" class="feedback-overlay"></div>
+        </div>
+
+    </main>
+
+    <script>
+        /**
+         * MENU DATA & QUESTIONS
+         */
+        const PRICE_LIST = {
+            "Kafea": 1.20,
+            "Te berdea": 1.50,
+            "Ur botila": 1.00,
+            "Freskagarria": 2.50,
+            "Garagardoa": 3.00,
+            "Ardo kopa": 2.80,
+            "Pintxoa": 2.00,
+            "Tortilla": 3.50,
+            "Kruasana": 1.80,
+            "Zuku naturala": 2.20
+        };
+
+        // Bank of 50 questions
+        const QUESTION_BANK = [
+            { t: "2 Kafe + Pintxo 1", v: 4.40 },
+            { t: "3 Garagardo", v: 9.00 },
+            { t: "Ur botila 1 + Tortilla 1", v: 4.50 },
+            { t: "2 Zuku + 2 Kruasan", v: 8.00 },
+            { t: "4 Ardo kopa", v: 11.20 },
+            { t: "Freskagarri 1 + Pintxo 1", v: 4.50 },
+            { t: "3 Te berde", v: 4.50 },
+            { t: "Kafe 1 + Kruasan 1", v: 3.00 },
+            { t: "2 Tortilla + 2 Freskagarri", v: 12.00 },
+            { t: "5 Ur botila", v: 5.00 },
+            { t: "2 Ardo + 2 Pintxo", v: 9.60 },
+            { t: "Kafe 1 + Te 1 + Zuku 1", v: 4.90 },
+            { t: "3 Pintxo + Garagardo 1", v: 9.00 },
+            { t: "Tortilla 1 + Ardo 1", v: 6.30 },
+            { t: "4 Zuku natural", v: 8.80 },
+            { t: "2 Freskagarri + 2 Ur", v: 7.00 },
+            { t: "Kafe 2 + Tortilla 1", v: 5.90 },
+            { t: "3 Ardo + Pintxo 1", v: 10.40 },
+            { t: "Garagardo 2 + Pintxo 2", v: 10.00 },
+            { t: "Te 1 + Kruasan 1", v: 3.30 },
+            { t: "4 Kafe", v: 4.80 },
+            { t: "2 Tortilla", v: 7.00 },
+            { t: "3 Freskagarri", v: 7.50 },
+            { t: "Ur 1 + Pintxo 3", v: 7.00 },
+            { t: "Zuku 2 + Te 1", v: 5.90 },
+            { t: "Ardo 1 + Pintxo 2 + Kafe 1", v: 8.00 },
+            { t: "Garagardo 3 + Tortilla 1", v: 12.50 },
+            { t: "Kafe 3 + Kruasan 2", v: 7.20 },
+            { t: "2 Ur + 2 Zuku", v: 6.40 },
+            { t: "4 Pintxo", v: 8.00 },
+            { t: "3 Te + 2 Kafe", v: 6.90 },
+            { t: "Freskagarri 2 + Kruasan 1", v: 6.80 },
+            { t: "Tortilla 2 + Ur 1", v: 8.00 },
+            { t: "Garagardo 4 + Pintxo 1", v: 14.00 },
+            { t: "Ardo 2 + Freskagarri 1", v: 8.10 },
+            { t: "Kafe 1 + Zuku 1 + Pintxo 1", v: 5.40 },
+            { t: "3 Ur + 1 Kruasan", v: 4.80 },
+            { t: "2 Te + 2 Ardo", v: 8.60 },
+            { t: "5 Pintxo", v: 10.00 },
+            { t: "Tortilla 1 + Zuku 2", v: 7.90 },
+            { t: "Kafe 5", v: 6.00 },
+            { t: "Garagardo 1 + Ardo 1 + Pintxo 1", v: 7.80 },
+            { t: "3 Kruasan + 3 Kafe", v: 9.00 },
+            { t: "2 Freskagarri + 1 Tortilla", v: 8.50 },
+            { t: "Ur 4 + Zuku 1", v: 6.20 },
+            { t: "Ardo 3 + Pintxo 3", v: 14.40 },
+            { t: "Te 4", v: 6.00 },
+            { t: "Garagardo 2 + Kruasan 2", v: 9.60 },
+            { t: "Kafe 2 + Pintxo 2 + Ur 2", v: 8.40 },
+            { t: "3 Tortilla", v: 10.50 }
+        ];
+
+        /**
+         * GAME STATE & LOGIC
+         */
+        const game = {
+            active: false,
+            currentQuestionIdx: 0,
+            sessionQuestions: [],
+            scoreP1: 0,
+            scoreP2: 0,
+            correctP1: 0,
+            correctP2: 0,
+            timeP1: 0,
+            timeP2: 0,
+            p1Answered: false,
+            p2Answered: false,
+            totalQuestions: 10,
+            playerMode: 2, // 1 or 2 players
+            startTime: null,
+            p1StartTime: null,
+            p2StartTime: null,
+            timerInterval: null,
+
+            init() {
+                // Populate price list UI
+                const menuEl = document.getElementById('menu-items');
+                menuEl.innerHTML = Object.entries(PRICE_LIST).map(([name, price]) => `
+                    <div class="menu-item">
+                        <span class="text-gray-300 font-medium">${name}</span>
+                        <span class="text-white font-bold">${price.toFixed(2)}€</span>
+                    </div>
+                `).join('');
+            },
+
+            start(numPlayers = 2) {
+                this.playerMode = numPlayers;
+                this.scoreP1 = 0;
+                this.scoreP2 = 0;
+                this.correctP1 = 0;
+                this.correctP2 = 0;
+                this.timeP1 = 0;
+                this.timeP2 = 0;
+                this.currentQuestionIdx = 0;
+                this.active = true;
+                this.startTime = Date.now();
+                this.p1StartTime = Date.now();
+                this.p2StartTime = Date.now();
+                
+                // Randomly pick 10 questions
+                this.sessionQuestions = this.shuffle(QUESTION_BANK).slice(0, this.totalQuestions);
+                
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('game-over-screen').style.display = 'none';
+                
+                // Show game controls
+                document.getElementById('game-controls').classList.add('active');
+                
+                // Show/hide player 2 zone based on mode
+                const p2Zone = document.getElementById('p2-zone');
+                if (numPlayers === 1) {
+                    p2Zone.style.display = 'none';
+                    document.querySelector('.game-container').style.gridTemplateColumns = '1fr 400px';
+                } else {
+                    p2Zone.style.display = 'flex';
+                    document.querySelector('.game-container').style.gridTemplateColumns = '1fr 400px 1fr';
+                }
+                
+                this.updateUI();
+                this.loadQuestion();
+                this.startTimer();
+            },
+
+            startTimer() {
+                this.timerInterval = setInterval(() => {
+                    if (!this.p1Answered && this.playerMode >= 1) {
+                        this.timeP1 = (Date.now() - this.p1StartTime) / 1000;
+                        document.getElementById('p1-time').innerText = this.timeP1.toFixed(1) + 's';
+                    }
+                    if (!this.p2Answered && this.playerMode === 2) {
+                        this.timeP2 = (Date.now() - this.p2StartTime) / 1000;
+                        document.getElementById('p2-time').innerText = this.timeP2.toFixed(1) + 's';
+                    }
+                }, 100);
+            },
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            },
+
+            shuffle(array) {
+                return array.sort(() => Math.random() - 0.5);
+            },
+
+            loadQuestion() {
+                this.p1Answered = false;
+                this.p2Answered = false;
+                this.p1StartTime = Date.now();
+                this.p2StartTime = Date.now();
+                
+                const q = this.sessionQuestions[this.currentQuestionIdx];
+                
+                // Generate options
+                const options = this.generateOptions(q.v);
+                
+                // Update text
+                document.getElementById('p1-question').innerText = q.t;
+                if (this.playerMode === 2) {
+                    document.getElementById('p2-question').innerText = q.t;
+                }
+                
+                // Update buttons
+                const p1Ops = document.getElementById('p1-options');
+                const p2Ops = document.getElementById('p2-options');
+                
+                const btnHTML = (playerNum) => options.map(opt => `
+                    <div class="option-btn p${playerNum}-btn" onclick="game.handleAnswer(${playerNum}, ${opt})">
+                        ${opt.toFixed(2)}€
+                    </div>
+                `).join('');
+
+                p1Ops.innerHTML = btnHTML(1);
+                if (this.playerMode === 2) {
+                    p2Ops.innerHTML = btnHTML(2);
+                }
+                
+                // Update progress
+                const progress = ((this.currentQuestionIdx + 1) / this.totalQuestions) * 100;
+                document.getElementById('progress-bar').style.width = `${progress}%`;
+                document.getElementById('q-counter').innerText = `${this.currentQuestionIdx + 1} / ${this.totalQuestions}`;
+            },
+
+            generateOptions(correct) {
+                const ops = new Set();
+                ops.add(correct);
+                while(ops.size < 4) {
+                    // Generate random nearby values
+                    const diff = (Math.floor(Math.random() * 5) + 1) * 0.20;
+                    const val = Math.random() > 0.5 ? correct + diff : correct - diff;
+                    if (val > 0) ops.add(Number(val.toFixed(2)));
+                }
+                return this.shuffle(Array.from(ops));
+            },
+
+            handleAnswer(player, val) {
+                if (!this.active) return;
+                if (player === 1 && this.p1Answered) return;
+                if (player === 2 && this.p2Answered) return;
+
+                const correctVal = this.sessionQuestions[this.currentQuestionIdx].v;
+                const isCorrect = Math.abs(val - correctVal) < 0.01;
+                
+                if (player === 1) {
+                    this.p1Answered = true;
+                    const questionTime = (Date.now() - this.p1StartTime) / 1000;
+                    
+                    if (isCorrect) {
+                        this.correctP1++;
+                        // Score: 100 points for correct answer, minus time penalty (max 50 points deduction)
+                        const timeBonus = Math.max(0, 100 - Math.floor(questionTime * 5));
+                        this.scoreP1 += timeBonus;
+                    }
+                    
+                    this.showFeedback(1, isCorrect);
+                } else {
+                    this.p2Answered = true;
+                    const questionTime = (Date.now() - this.p2StartTime) / 1000;
+                    
+                    if (isCorrect) {
+                        this.correctP2++;
+                        // Score: 100 points for correct answer, minus time penalty (max 50 points deduction)
+                        const timeBonus = Math.max(0, 100 - Math.floor(questionTime * 5));
+                        this.scoreP2 += timeBonus;
+                    }
+                    
+                    this.showFeedback(2, isCorrect);
+                }
+
+                this.updateUI();
+
+                // Check if should move on
+                const shouldAdvance = this.playerMode === 1 ? this.p1Answered : (this.p1Answered && this.p2Answered);
+                if (shouldAdvance) {
+                    setTimeout(() => {
+                        this.nextQuestion();
+                    }, 1200);
+                }
+            },
+
+            showFeedback(player, isCorrect) {
+                const el = document.getElementById(`p${player}-feedback`);
+                el.innerText = isCorrect ? 'ZUZEN!' : 'GAIZKI!';
+                el.className = `feedback-overlay ${isCorrect ? 'correct' : 'wrong'}`;
+                el.style.opacity = '1';
+                
+                // Visual bounce
+                const zone = document.getElementById(`p${player}-zone`);
+                zone.style.transform = 'scale(0.98)';
+                
+                setTimeout(() => {
+                    el.style.opacity = '0';
+                    zone.style.transform = 'scale(1)';
+                }, 1000);
+            },
+
+            updateUI() {
+                document.getElementById('p1-score').innerText = this.scoreP1;
+                document.getElementById('p1-time').innerText = this.timeP1.toFixed(1) + 's';
+                
+                if (this.playerMode === 2) {
+                    document.getElementById('p2-score').innerText = this.scoreP2;
+                    document.getElementById('p2-time').innerText = this.timeP2.toFixed(1) + 's';
+                }
+            },
+
+            nextQuestion() {
+                this.currentQuestionIdx++;
+                if (this.currentQuestionIdx >= this.totalQuestions) {
+                    this.end();
+                } else {
+                    this.loadQuestion();
+                }
+            },
+
+            end() {
+                this.active = false;
+                this.stopTimer();
+                
+                const winText = document.getElementById('winner-text');
+                const overScreen = document.getElementById('game-over-screen');
+                const gameOverContent = document.getElementById('game-over-content');
+                
+                const totalTimeP1 = this.timeP1;
+                const totalTimeP2 = this.timeP2;
+                
+                if (this.playerMode === 1) {
+                    // Single player mode
+                    winText.innerText = `EMAITZA: ${this.correctP1}/${this.totalQuestions} ZUZEN`;
+                    winText.style.color = "var(--p1-color)";
+                    
+                    gameOverContent.innerHTML = `
+                        <div class="text-center">
+                            <p class="text-4xl text-gray-400 mb-2">1. Zerbitzaria</p>
+                            <p class="text-8xl font-bold mb-4">${this.scoreP1}</p>
+                            <p class="text-3xl text-gray-500">Zuzenak: ${this.correctP1}/${this.totalQuestions}</p>
+                            <p class="text-3xl text-gray-500">Denbora: ${totalTimeP1.toFixed(1)}s</p>
+                        </div>
+                    `;
+                } else {
+                    // Two player mode
+                    if (this.scoreP1 > this.scoreP2) {
+                        winText.innerText = "IRABAZLEA: 1. ZERBITZARIA";
+                        winText.style.color = "var(--p1-color)";
+                    } else if (this.scoreP2 > this.scoreP1) {
+                        winText.innerText = "IRABAZLEA: 2. ZERBITZARIA";
+                        winText.style.color = "var(--p2-color)";
+                    } else {
+                        winText.innerText = "BERDINKETA!";
+                        winText.style.color = "white";
+                    }
+                    
+                    gameOverContent.innerHTML = `
+                        <div class="text-center">
+                            <p class="text-4xl text-gray-400 mb-2">1. Zerbitzaria</p>
+                            <p class="text-8xl font-bold mb-4">${this.scoreP1}</p>
+                            <p class="text-3xl text-gray-500">Zuzenak: ${this.correctP1}/${this.totalQuestions}</p>
+                            <p class="text-3xl text-gray-500">Denbora: ${totalTimeP1.toFixed(1)}s</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-4xl text-gray-400 mb-2">2. Zerbitzaria</p>
+                            <p class="text-8xl font-bold mb-4">${this.scoreP2}</p>
+                            <p class="text-3xl text-gray-500">Zuzenak: ${this.correctP2}/${this.totalQuestions}</p>
+                            <p class="text-3xl text-gray-500">Denbora: ${totalTimeP2.toFixed(1)}s</p>
+                        </div>
+                    `;
+                }
+                
+                overScreen.style.display = 'flex';
+
+                // Confetti for the winner
+                if (typeof confetti !== 'undefined') {
+                    confetti({
+                        particleCount: 200,
+                        spread: 70,
+                        origin: { y: 0.6 }
+                    });
+                }
+                
+                // Hide game controls
+                document.getElementById('game-controls').classList.remove('active');
+            },
+
+            restartGame() {
+                if (!this.active) return;
+                
+                // Stop the game
+                this.active = false;
+                this.stopTimer();
+                
+                // Hide game controls
+                document.getElementById('game-controls').classList.remove('active');
+                
+                // Show start screen
+                document.getElementById('start-screen').style.display = 'flex';
+                document.getElementById('game-over-screen').style.display = 'none';
+            },
+        };
+
+        // Global initialization
+        window.onload = () => {
+            game.init();
+        };
+
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
